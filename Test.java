@@ -8,13 +8,13 @@ class Test{
 		c.InitReadMidi( "hoge.mid" );
 
 		//c.ChangeBPM( 200 );
-		c.ChangeVoiceMessage( 0, 55 );
+		c.ChangeVoiceMessage( 0, 120 );
 
-		c.play();
-
-		System.in.read();
+		//c.play();
+		c.WriteMidi();
+		//System.in.read();
 		
-		c.stop();
+		//c.stop();
 		c.bye();
 	}
 }
