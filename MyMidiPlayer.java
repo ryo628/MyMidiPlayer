@@ -5,8 +5,12 @@ class MyMidiPlayer
 {
   //実際にMidiを再生するプレイヤー
   Sequencer sequencer;
+  //曲データ
   Sequence inSeq;
+  Sequence outSeq;
+  //トラック(0~16)を保持する配列
   Track track[];
+  Track newTrack;
 
   //コンストラクタ（実際に音を演奏するSequencerを取得・設定する。
   MyMidiPlayer()
@@ -31,12 +35,35 @@ class MyMidiPlayer
   }
 
   //nameで指定したmidiファイルを再生する
-  void ReadMidi(String name)
+  void InitReadMidi(String name)
   {
     try
     {
       // ファイル読み込み
       FileInputStream in = new FileInputStream(name);
+      // 音源の取り込み
+      inSeq = MidiSystem.getSequence(in);
+      //ファイルクローズ
+      in.close();
+
+      //トラック入手
+      this.track = inSeq.getTracks();
+    }
+    //エラー処理
+    catch(Exception e)
+    {
+      //エラー表示
+      System.out.println( "Err =" + e );
+    }
+  }
+
+  //新しくしたmidiを読み込む
+  void LoadMidi()
+  {
+    try
+    {
+      // ファイル読み込み
+      FileInputStream in = new FileInputStream("back.mid");
       // 音源の取り込み
       inSeq = MidiSystem.getSequence(in);
       //ファイルクローズ
@@ -59,7 +86,7 @@ class MyMidiPlayer
     try
     {
       //音源セット
-      sequencer.setSequence( inSeq );
+      sequencer.setSequence( outSeq );
     }
     catch( InvalidMidiDataException e )
     {
@@ -101,18 +128,46 @@ class MyMidiPlayer
   void ChangeVoiceMessage( int channel, int mode )
   {
     ShortMessage sMes = new ShortMessage();
+    MidiEvent e;
+    byte[] m;
 
     //
     try
     {
       sMes.setMessage( ShortMessage.PROGRAM_CHANGE, channel, mode, 0 );
-      track[ channel ].remove( track[channel].get(ShortMessage.PROGRAM_CHANGE) );
-      track[ channel ].add( new MidiEvent( sMes, 0 ) );
-      System.out.println("voiceMessage is changed!");
+      newTrack.add( new MidiEvent( sMes, 0 ) );
+
+      for( int i = 0; ; )
+      {
+          try
+          {
+            e = track[ channel ].get(i++);
+            m = e.getMessage().getMessage();
+          }
+          catch(ArrayIndexOutOfBoundsException ex)
+          {
+            break;
+          }
+
+          // ON_NOTE と OFF_NOTE
+          if( ( m[0] & 0xF0 ) == 0x90 ||  ( m[0] & 0xF0 ) == 0x80  )
+          {
+            newTrack.add( new MidiEvent( sMes, 0 ) );
+          }
+      }
+      
+      outSeq.addTrack( newTrack );
+
+      for(int i = 0; i <= sizeof( track ); i++ )
+      {
+        if( i == channel ) continue;
+
+        outSeq.addTrack( track[i] );
+      }
     }
-    catch( InvalidMidiDataException e )
+    catch( InvalidMidiDataException me )
     {
-      System.out.println( "Err = " + e );
+      System.out.println( "Err = " + me );
     }
   }
 

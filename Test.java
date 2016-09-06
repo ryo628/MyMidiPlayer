@@ -5,10 +5,10 @@ class Test{
 	{
 		MyMidiPlayer c = new MyMidiPlayer();
 
-		c.ReadMidi( "hoge.mid" );
+		c.InitReadMidi( "hoge.mid" );
 
 		//c.ChangeBPM( 200 );
-		c.ChangeVoiceMessage( 0, 23 );
+		c.ChangeVoiceMessage( 0, 55 );
 
 		c.play();
 
