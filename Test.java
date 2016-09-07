@@ -1,23 +1,21 @@
-import java.io.*;
-import javax.sound.midi.*;
-
 class Test{
 	public static void main(String args[]) throws IOException, InterruptedException, InvalidMidiDataException
 	{
 		MyMidiPlayer c = new MyMidiPlayer();
-
-		// 読み込んだら即再生開始になってる(要修正) TODO!
-		c.InitReadMidi( "hoge.mid" );
-		//c.play();
 		int i = 0;
 
-		
+		//読み込み
+		c.InitReadMidi( "hoge.mid" );
+		//再生
+		c.play();
+
+		/* 動作確認 */
+
 		//音量
 		while( i < 100 )
 		{
 			Thread.sleep(2000);
-			c.ChangeVelocity( 0, ( i%2 == 1 )? 50:150 );
-			i++;
+			c.ChangeVelocity( 0, ( i++%2 == 1 )? 50:150 );
 		}
 
 		
@@ -35,14 +33,13 @@ class Test{
 		while( i < 100 )
 		{
 			Thread.sleep(4000);
-			c.ChangeBPM( ( i%2 == 1 )? 60:120 );
-			i-=20;
+			c.ChangeBPM( ( i++%2 == 1 )? 60:120 );
 		}
 		*/
 
-
+		//再生停止
 		c.stop();
-
+		//シーケンサ開放処理
 		c.bye();
 	}
 }
