@@ -1,5 +1,6 @@
 import java.io.*;           //外部からデータを取り込みに必要
 import javax.sound.midi.*;  //Midiの扱いに必要
+import java.nio.ByteBuffer;
 
 class MyMidiPlayer
 {
@@ -41,7 +42,7 @@ class MyMidiPlayer
     
     //トラック入手
     this.track = inSeq.getTracks();
-
+  
     //再生
     this.play( inSeq );
   }
@@ -102,9 +103,87 @@ class MyMidiPlayer
   }
 
   //音量調整
-  void ChangeVelocity( int vel )
+  void ChangeVelocity( int channel, int vel ) throws IOException, InvalidMidiDataException
   {
-    //考える
+    MetaMessage mMes = new MetaMessage();
+    ShortMessage sMes = new ShortMessage();
+    Track newTrack[] = new Track[16];
+    
+    //再生停止 : TODO
+    long pos = sequencer.getTickPosition();
+    this.stop();
+
+    //音更新
+    this.LoadMidi();
+
+    // 変更後保存のシーケンサ設定
+    float dType = inSeq.getDivisionType();
+    int dTick = inSeq.getResolution();
+    Sequence outSeq = new Sequence( dType, dTick );
+
+    // トラックの紐付け
+    for( int i = 0; i < 16; i++) newTrack[ i ] = outSeq.createTrack();
+      
+    // テンポ設定(適当:本来はgetした値)
+    int l = 60*1000000 / 120; // 60*1000000/tempo[micro sec/beat]
+    mMes.setMessage(0x51, 
+                    new byte[]{ (byte)( l /256 /256 ),
+                                (byte)( l /256 %256 ),
+                                (byte)( l %256 ) }, 
+                    3);
+    newTrack[ channel ].add( new MidiEvent( mMes, 0 ) );
+      
+    //音色設定 
+    newTrack[ channel ].add( track[ channel ].get( 189 ) );
+
+    //音のmidieventをぶち込む
+    MidiEvent e;
+    byte[] m;
+    for( int i = 0; ; i++ )
+    {
+      try
+      {
+        // midiEvent 取得
+        e = track[ channel ].get(i);
+        // byte[]データ取得
+        m = e.getMessage().getMessage();
+      }
+      catch(ArrayIndexOutOfBoundsException ex) { break; }
+
+      // ON_NOTE 
+      if( ( m[0] & 0xF0 ) == 0x90 )
+      {
+        // velocity 変更
+        sMes.setMessage( ShortMessage.NOTE_ON, channel, m[1] & 0xFF, vel & 0x007F );
+        newTrack[ channel ].add( new MidiEvent( sMes, e.getTick() ) );
+      }
+      // NOTE_OFF
+      else if( ( m[0] & 0xF0 ) == 0x80 )
+      {
+        newTrack[ channel ].add( e );
+      }
+    }
+      
+    //他トラック処理
+    for(int i = 0; i <= track.length; i++ )
+    {
+      //音色変えたトラックは元データで上書きしない
+      if( i == channel ) continue;
+
+      try
+      {
+        //他トラックは上書き
+        newTrack[ i ] = track[ i ];
+      }
+      catch(ArrayIndexOutOfBoundsException ex) { break; }
+    }
+
+    //書き出し
+    this.WriteMidi( outSeq );
+
+    // 再生再開 : TODO
+    sequencer.setTickPosition( pos );
+    this.play( outSeq );
   }
 
   //音色変更
@@ -187,45 +266,93 @@ class MyMidiPlayer
   }
 
   //テンポ変更
-  void ChangeBPM( int bpm )
+  void ChangeBPM( int bpm ) throws IOException, InvalidMidiDataException
   {
     //エラー処理(適当)
-    if( bpm < 20 || 256 > bpm ) return;
+    if( bpm < 20 || 400 < bpm ) return;
 
-    //4分音符の長さ[micro s]
-    int newL = 60 * 1000000 / bpm;
+    MetaMessage mMes = new MetaMessage();
+    ShortMessage sMes = new ShortMessage();
+    Track newTrack[] = new Track[16];
+    
+    //再生停止 : TODO
+    long pos = sequencer.getTickPosition();
+    this.stop();
 
-    sequencer.setTempoInBPM( (float)bpm );
+    //音更新
+    this.LoadMidi();
 
-    /*
-    try
+    // 変更後保存のシーケンサ設定
+    float dType = inSeq.getDivisionType();
+    int dTick = inSeq.getResolution();
+    Sequence outSeq = new Sequence( dType, dTick );
+
+    // トラックの紐付け
+    for( int i = 0; i < newTrack.length; i++) newTrack[ i ] = outSeq.createTrack();
+      
+    // テンポ設定
+    int l = 60*1000000 / bpm; // 60*1000000/tempo[micro sec/beat]
+    mMes.setMessage(0x51, 
+                    new byte[]{ (byte)( l /256 /256 ),
+                                (byte)( l /256 %256 ),
+                                (byte)( l %256 ) }, 
+                    3);
+    
+    //全トラックへテンポ・音色設定
+    for( int i = 0; i < track.length; i++ )
     {
-      //新しいテンポのMetaMessage作成
-      MetaMessage mMes = new MetaMessage();
-      mMes.setMessage( 0x51, //テンポ
-                       new byte[]{ (byte)( newL /256 /256 ),
-                                   (byte)( newL /256 ),
-                                   (byte)( newL %256 ),},
-                       3);
+      //テンポ
+      newTrack[ i ].add( new MidiEvent( mMes, 0 ) );
 
-      MetaMessage rm = new MetaMessage();
-      rm.setMessage( 0x51, new byte[3], 3 );
+      //音色
+      //sMes.setMessage( ShortMessage.PROGRAM_CHANGE, i, 0, 0 );
+      newTrack[ i ].add( track[ i ].get( 189 ) );
+    }
 
-      //全トラックへの適用
-      for( Track t : track )
+    //音のmidieventをぶち込む
+    MidiEvent e;
+    byte[] m;
+
+    //全トラックへNOTE ON, OFF設定
+    int t;
+    for( t = 0; t < track.length; t++ )
+    {
+      for( int i = 0; ; i++ )
       {
-        //
-        t.remove( new MidiEvent( rm, 0 ) );
-        //新テンポ
-        boolean flag = t.add( new MidiEvent( mMes, 0 ) );
+        try
+        {
+          // midiEvent 取得
+          e = track[ t ].get(i);
+          // byte[]データ取得
+          m = e.getMessage().getMessage();
+        }
+        catch(ArrayIndexOutOfBoundsException ex) { break; }
 
-        System.out.println("re tempo" + flag );
+        // ON_NOTE と OFF_NOTE
+        if( ( m[0] & 0xF0 ) == 0x90 ||  ( m[0] & 0xF0 ) == 0x80  )
+        {
+          // NOTEのON, OFFはそのまま
+          newTrack[ t ].add( e );
+        }
       }
     }
-    catch( InvalidMidiDataException e )
+
+    //他トラック処理
+    for(int i = t; i <= track.length; i++ )
     {
-      //
-      System.out.println( "Err =" + e );
-    }*/
+      try
+      {
+        //他トラックは上書き
+        newTrack[ i ] = track[ i ];
+      }
+      catch(ArrayIndexOutOfBoundsException ex) { break; }
+    }
+
+    //書き出し
+    this.WriteMidi( outSeq );
+
+    // 再生再開 : TODO
+    sequencer.setTickPosition( pos );
+    this.play( outSeq );
   }
 }
