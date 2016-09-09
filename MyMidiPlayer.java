@@ -40,6 +40,9 @@ class MyMidiPlayer
       
       //トラック入手
       this.track = inSeq.getTracks();
+
+      //再生
+      this.play( inSeq );
     }
     catch( InvalidMidiDataException | IOException e )
     {
@@ -205,18 +208,18 @@ class MyMidiPlayer
         }
         catch( ArrayIndexOutOfBoundsException ex ) { break; }
       }
+
+      //書き出し
+      this.WriteMidi( outSeq );
+
+      // 再生再開
+      sequencer.setTickPosition( pos );
+      this.play( outSeq );
     }
     catch( InvalidMidiDataException e )
     {
       System.out.println( "" + e );
     }
-
-    //書き出し
-    this.WriteMidi( outSeq );
-
-    // 再生再開
-    sequencer.setTickPosition( pos );
-    this.play( outSeq );
   }
 
   // 音色変更
@@ -293,18 +296,18 @@ class MyMidiPlayer
         }
         catch( ArrayIndexOutOfBoundsException ex ) { break; }
       }
+    
+      //書き出し
+      this.WriteMidi( outSeq );
+
+      // 再生再開 : TODO
+      sequencer.setTickPosition( pos );
+      this.play( outSeq );
     }
     catch( InvalidMidiDataException e )
     {
       System.out.println( "" + e );
     }
-
-    //書き出し
-    this.WriteMidi( outSeq );
-
-    // 再生再開 : TODO
-    sequencer.setTickPosition( pos );
-    this.play( outSeq );
   }
 
   //テンポ変更
@@ -380,17 +383,17 @@ class MyMidiPlayer
           }
         }
       }
+
+      //書き出し
+      this.WriteMidi( outSeq );
+
+      // 再生再開
+      sequencer.setTickPosition( pos );
+      this.play( outSeq );
     }
     catch( InvalidMidiDataException e )
     {
       System.out.println( "" + e );
     }
-
-    //書き出し
-    this.WriteMidi( outSeq );
-
-    // 再生再開
-    sequencer.setTickPosition( pos );
-    this.play( outSeq );
   }
 }
